@@ -17,9 +17,11 @@ html: html files for all the programs
 
 mic.FCStd: 10mm microphone capsule for headset
 
-usbmic.c: ultimate vlogging mic on raspberry pi with 1 soundcard
+usbmic.c: ultimate vlogging mic on raspberry pi with 1 soundcard.
+    Records sound from a headset microphone while monitoring it in the headset.
 
 usbmic2.c: 2 channel bootleg recorder on a raspberry pi with 2 soundcards
+    Records sound without monitoring.
 
 ZOOM RECORDER REPLACEMENT:
 
