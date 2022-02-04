@@ -1,0 +1,6 @@
+#/root/jack2-1.9.12/build/jackd -P70 -p16 -t2000 -dalsa -dhw:1 -p256 -n3 -r48000 -s &
+#/root/jack2-1.9.12/build/jackd -P70 -p16 -t2000 -dalsa -Phw:1 -Cmerge -p256 -n3 -r48000 -s &
+#/root/jack2-1.9.12/build/jackd -P70 -p16 -t2000 -dalsa -Cmerge -p256 -n3 -r48000 -s &
+sleep 1
+cd /root && ./usbmic &
+

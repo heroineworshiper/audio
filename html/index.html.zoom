@@ -1,0 +1,741 @@
+<!-- Web interface for the Zoom replacement -->
+<meta charset="utf-8">
+
+<style>
+
+h1 {
+    font-size: 300%;
+}
+
+input[type=radio] {
+    border: 0px;
+    width: 100%;
+    height: 4em;
+}
+
+table {
+    border-spacing: 0px;
+}
+
+th, td {
+    padding: 0px;
+    text-align: left;
+	vertical-align: center;
+}
+
+
+
+
+.slidecontainer {
+    width: 100%;
+}
+
+.slider {
+    -webkit-appearance: none;
+    width: 90%;
+    height: 7%;
+    background: #ffffff;
+    outline: solid;
+    opacity: 1;
+    -webkit-transition: .2s;
+    transition: opacity .2s;
+}
+
+.slider:hover {
+    opacity: 1;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 10%;
+    height: 100%;
+    background: #000000;
+    cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+    width: 25px;
+    height: 100%;
+    background: #4CAF50;
+    cursor: pointer;
+}
+
+</style>
+
+<CENTER>
+<H1>
+<P>
+<div id="meterDivisionsDiv">
+<canvas id="meterDivisions" style="border:0px solid #000000;"> </canvas><BR>
+</div>
+<div id="meter0div">
+<canvas id="meter0" style="border:0px solid #000000;"> </canvas><BR>
+</div>
+<div id="meter1div">
+<canvas id="meter1" style="border:0px solid #000000;"> </canvas><BR>
+</div>
+<div id="meter2div">
+<canvas id="meter2" style="border:0px solid #000000;"> </canvas><BR>
+</div>
+<div id="meter3div">
+<canvas id="meter3" style="border:0px solid #000000;"> </canvas><BR>
+</div>
+
+AUX HEADPHONE VOLUME:<BR>
+<input type="range" id="volume0" class="slider" onchange="handleVolume0(value)"><BR>
+
+MANE HEADPHONE VOLUME:<BR>
+<input type="range" id="volume1" class="slider" onchange="handleVolume1(value)"><BR>
+
+<TABLE BORDER=1>
+	<TR>
+		<TD>
+			<IMG SRC="single.gif" WIDTH=100 HEIGHT=1>
+		</TD>
+		<TD>
+			<H1>AUX/I2S2
+			<IMG SRC="single.gif" WIDTH=50>
+		</TD>
+		<TD>
+			<H1>MANE/I2S3
+			<IMG SRC="single.gif" WIDTH=50>
+		</TD>
+	</TR>
+	<TR>
+		<TD>
+			<H1><input onClick="modeEvent()" type="radio" id="mode0" name="time" value="0">
+		</TD>
+		<TD>
+			<H1>L +/-
+		</TD>
+		<TD>
+			<H1>R +/-
+		</TD>
+	</TR>
+	<TR>
+		<TD>
+			<H1><input onClick="modeEvent()" type="radio" id="mode1" name="time" value="1">
+		</TD>
+		<TD>
+			<H1>L/R
+		</TD>
+		<TD>
+			<H1>L/R
+		</TD>
+	</TR>
+	<TR>
+		<TD>
+			<H1><input onClick="modeEvent()" type="radio" id="mode2" name="time" value="2">
+		</TD>
+		<TD>
+			<H1>L/R
+		</TD>
+		<TD>
+			<H1>MONO +/-
+		</TD>
+	</TR>
+	<TR>
+		<TD>
+			<H1><input onClick="modeEvent()" type="radio" id="mode3" name="time" value="3">
+		</TD>
+		<TD>
+			<H1>L/L
+		</TD>
+		<TD>
+			<H1>R/R
+		</TD>
+	</TR>
+	<TR>
+		<TD>
+			<H1><input onClick="modeEvent()" type="radio" id="mode4" name="time" value="4">
+		</TD>
+		<TD>
+			<H1>OFF
+		</TD>
+		<TD>
+			<H1>MONO +/-
+		</TD>
+	</TR>
+</TABLE>
+
+
+<output id="filename0"></output><BR>
+<output id="filename1"></output><BR>
+<output id="length"></output> RECORDED<BR>
+<output id="remane"></output> REMANEING<BR>
+<output id="wifi"></output><BR>
+
+<div id="record">
+<IMG onClick="record()" SRC="record.png" BORDER=1 WIDTH=25%><P>
+</div>
+
+<div id="stop">
+<IMG onClick="stop()" SRC="stop.png" BORDER=1 WIDTH=25%><P>
+</div>
+
+</CENTER>
+<div id="debug_">
+debug=<output id="debug"></output><P>
+</div>
+
+<script>
+
+
+
+
+var debug = document.getElementById("debug")
+var debug_ = document.getElementById("debug_")
+debug_.style.display = "none"
+
+var volume1 = document.getElementById("volume1")
+var volume0 = document.getElementById("volume0")
+
+var gain = document.getElementById("gain")
+var filename1 = document.getElementById("filename1")
+var filename0 = document.getElementById("filename0")
+var length = document.getElementById("length")
+var remane = document.getElementById("remane")
+
+var meter0 = document.getElementById("meter0")
+var meter1 = document.getElementById("meter1")
+var meter2 = document.getElementById("meter2")
+var meter3 = document.getElementById("meter3")
+var meter0div = document.getElementById("meter0div")
+var meter1div = document.getElementById("meter1div")
+var meter2div = document.getElementById("meter2div")
+var meter3div = document.getElementById("meter3div")
+
+var mode0 = document.getElementById("mode0")
+var mode1 = document.getElementById("mode1")
+var mode2 = document.getElementById("mode2")
+var mode3 = document.getElementById("mode3")
+var mode4 = document.getElementById("mode4")
+
+
+// left I2S2, right from I2S3 with differential inputs
+// single monitor volume used
+var MONITOR_2CH_DIFF = 0
+
+// left right I2S2, left right I2S3 with single ended inputs
+// 2 monitor_volumes used
+var MONITOR_4CH = 1
+
+// left right I2S2 with single ended inputs, mono I2S3 with differential inputs
+// 2 monitor_volumes used
+var MONITOR_3CH = 2
+
+// left I2S2, right I2S3 with averaged single ended inputs
+// single monitor volume used
+var MONITOR_2CH_AVG = 3
+
+// I2S3 differential inputs.  
+// Use MONITOR_2CH_AVG for channel averaging, because the 2 I2S's are out of sync
+var MONITOR_1CH_DIFF = 4
+
+var mode = MONITOR_2CH_DIFF
+
+var meterText = [ "", "", "", "" ]
+
+var meterDivisions = document.getElementById("meterDivisions")
+var recordButton = document.getElementById("record")
+var stopButton = document.getElementById("stop")
+
+// what to send in the next request
+var needRecord = false
+var needStop = false
+var needVolume0 = true
+var needVolume1 = true
+var needMode = true
+
+var RIGHT_MARGIN = 10
+var FONT_MARGIN = 2
+var MIN_DB = -90.0
+var meterW = 0
+var meterH = 0
+var meterFont = 0
+var max = [ MIN_DB, MIN_DB, MIN_DB, MIN_DB ]
+var maxCounter = [ 0, 0, 0, 0 ]
+var MAX_COUNTER = 20
+var SAMPLERATE = 48000
+var MAX_VOLUME = 32
+var totalPings = 0
+var totalSends = 0
+var totalResponses = 0
+var droppedResponses = 0
+var foo = 0
+
+stopButton.style.display = "none"
+resizeEvent()
+window.addEventListener("resize", resizeEvent, false)
+loadDefaults()
+
+setInterval(refreshAll, 100);
+
+
+
+
+
+function handleVolume1(value)
+{
+	console.log("handleVolume1 volume="+ value)
+	setCookie("volume1", volume1.value)
+	needVolume1 = true
+}
+
+function handleVolume0(value)
+{
+	console.log("handleVolume0 volume="+ value)
+	setCookie("volume0", volume0.value)
+	needVolume0 = true
+}
+
+
+function modeEvent()
+{
+	if(mode0.checked)
+	{
+		mode = MONITOR_2CH_DIFF
+	}
+	else
+	if(mode1.checked)
+	{
+		mode = MONITOR_4CH
+	}
+	else
+	if(mode2.checked)
+	{
+		mode = MONITOR_3CH
+	}
+	else
+	if(mode3.checked)
+	{
+		mode = MONITOR_2CH_AVG
+	}
+	else
+	if(mode4.checked)
+	{
+		mode = MONITOR_1CH_DIFF
+	}
+
+	setCookie("mode", mode)
+	needMode = true
+	meterMode()
+}
+
+
+// show or hide meters based on mode
+function meterMode()
+{
+// need to use divs to get it to hide the spacing
+	switch(mode)
+	{
+		case MONITOR_2CH_DIFF:
+			meter0div.style.display = "inline"
+			meter1div.style.display = "inline"
+			meter2div.style.display = "none"
+			meter3div.style.display = "none"
+			meterText = [ "AUX +/-", "MANE +/-", "", "" ]
+			break
+		
+		case MONITOR_4CH:
+			meter0div.style.display = "inline"
+			meter1div.style.display = "inline"
+			meter2div.style.display = "inline"
+			meter3div.style.display = "inline"
+			meterText = [ "AUX L", "AUX R", "MANE L", "MANE R" ]
+			break
+
+		case MONITOR_3CH:
+			meter0div.style.display = "inline"
+			meter1div.style.display = "inline"
+			meter2div.style.display = "inline"
+			meter3div.style.display = "none"
+			meterText = [ "AUX L", "AUX R", "MANE +/-", "" ]
+			break
+
+		case MONITOR_2CH_AVG:
+			meter0div.style.display = "inline"
+			meter1div.style.display = "inline"
+			meter2div.style.display = "none"
+			meter3div.style.display = "none"
+			meterText = [ "L/L", "R/R", "", "" ]
+			break
+
+		case MONITOR_1CH_DIFF:
+			meter0div.style.display = "inline"
+			meter1div.style.display = "none"
+			meter2div.style.display = "none"
+			meter3div.style.display = "none"
+			meterText = [ "MANE +/-", "", "", "" ]
+			break;
+	}
+}
+
+
+function record()
+{
+	console.log("record")
+//	recordButton.style.display = "none"
+//	stopButton.style.display = "inline"
+	needRecord = true
+}
+
+
+function stop()
+{
+	console.log("stop")
+//	recordButton.style.display = "inline"
+//	stopButton.style.display = "none"
+	needStop = true
+}
+
+
+
+function dbToX(db)
+{
+	return (db - MIN_DB) * meterW / -MIN_DB
+}
+
+function drawLine(ctx, x1, y1, x2, y2)
+{
+	ctx.beginPath()
+	ctx.moveTo(x1, y1)
+	ctx.lineTo(x2, y2)
+	ctx.stroke()
+}
+
+function fillRect(ctx, x1, y1, x2, y2)
+{
+	ctx.beginPath()
+	ctx.moveTo(x1, y1)
+	ctx.lineTo(x2, y1)
+	ctx.lineTo(x2, y2)
+	ctx.lineTo(x1, y2)
+	ctx.fill()
+}
+
+function drawRect(ctx, x1, y1, x2, y2)
+{
+	ctx.beginPath()
+	ctx.moveTo(x1, y1)
+	ctx.lineTo(x2, y1)
+	ctx.lineTo(x2, y2)
+	ctx.lineTo(x1, y2)
+	ctx.stroke()
+}
+
+function drawMeterDivisions()
+{
+	var ctx = meterDivisions.getContext("2d") 
+	ctx.strokeStyle = "#000000"
+	ctx.font = meterFont  + "px sans-serif"
+	
+	ctx.textAlign = "right"
+	ctx.fillText("0", meterDivisions.width - FONT_MARGIN, meterDivisions.height - FONT_MARGIN)
+	drawLine(ctx, meterDivisions.width, 0, meterDivisions.width, meterDivisions.height)
+
+	ctx.textAlign = "left"
+	var ticks = [ -6, -12, -24, -40, -60, -80, MIN_DB ]
+	for(var i = 0; i < ticks.length; i++)
+	{
+		var db = ticks[i]
+		if(db >= MIN_DB)
+		{
+			var x = dbToX(db)
+
+			ctx.fillText(db, x + FONT_MARGIN, meterDivisions.height - FONT_MARGIN)
+			drawLine(ctx, x, 0, x, meterDivisions.height)
+		}
+	}
+}
+
+function pad(num, size) 
+{
+    var s = "000000000" + num
+    return s.substr(s.length - size)
+}
+
+
+function updateMeter(value, meter, index)
+{
+	if(meter.style.display == "none")
+	{
+		return
+	}
+
+
+	var db = MIN_DB
+	if(value >= 1)
+	{
+		var value2 = value / 8388607
+//		var value2 = value / 32767
+		db = 20.0 * Math.log10(value2)
+	}
+
+
+
+	if(db > max[index])
+	{
+		max[index] = db
+		maxCounter[index] = 0
+	}
+	else
+	{
+		maxCounter[index]++
+		if(maxCounter[index] >= MAX_COUNTER)
+		{
+			max[index] = db
+			maxCounter[index] = 0
+		}
+	}
+
+
+//console.log("updateMeter text=" + http.responseText + " value=" + value + " max=" + max + " maxCounter=" + maxCounter)
+
+	var x = dbToX(db)
+
+	var canvas = document.createElement('canvas')
+	canvas.width = meter.width
+	canvas.height = meter.height
+	var ctx = meter.getContext("2d")
+	var ctx2 = canvas.getContext("2d")
+
+	ctx2.fillStyle = "#ffffff"
+	fillRect(ctx2, 0, 0, canvas.width, canvas.height)
+
+
+
+	ctx2.fillStyle = "#000000"
+	ctx2.strokeStyle = "#000000"
+	drawRect(ctx2, 0, 0, canvas.width, canvas.height)
+	fillRect(ctx2, 0, 0, x, canvas.height)
+
+// draw the max
+	x = dbToX(max[index])
+	drawLine(ctx2, x, 0, x, canvas.height)
+	drawLine(ctx2, x + 1, 0, x + 1, canvas.height)
+
+	var TEXT_MARGIN = 10
+	ctx2.fillStyle = "#808080"
+	ctx2.strokeStyle = "#808080"
+	ctx2.textAlign = "right"
+	var titleFont = meterH - TEXT_MARGIN * 2
+	ctx2.font = titleFont + "px sans-serif"
+	ctx2.fillText(meterText[index], canvas.width - TEXT_MARGIN, canvas.height - TEXT_MARGIN)
+
+// blit it
+	ctx.drawImage(canvas, 0, 0)
+}
+
+
+var meterRefreshed = true
+function refreshAll()
+{
+	totalPings++
+	debug.innerHTML = totalPings + " " + totalSends + " " + totalResponses
+
+	if(meterRefreshed)
+	{
+		meterRefreshed = false
+		droppedResponses = 0
+		totalSends++
+
+		var http = new XMLHttpRequest()
+		http.onreadystatechange = function() {
+			if(http.readyState == 4)
+			{
+//console.log("refreshAll " + http.responseText)
+				totalResponses++
+				var response = http.responseText.split(" ")
+
+				var value0 = parseFloat(response[0])
+				var value1 = parseFloat(response[1])
+				var value2 = parseFloat(response[2])
+				var value3 = parseFloat(response[3])
+				var recording = parseInt(response[4])
+				var totalWritten = parseInt(response[5])
+				var totalRemane = parseInt(response[6])
+				var filenameIn0 = response[7]
+				var filenameIn1 = response[8]
+
+
+
+				if(recording > 0 && 
+					stopButton.style.display == "none")
+				{
+					recordButton.style.display = "none"
+					stopButton.style.display = "inline"
+				}
+				else
+				if(recording == 0 &&
+					recordButton.style.display == "none")
+				{
+					recordButton.style.display = "inline"
+					stopButton.style.display = "none"
+				}
+				
+
+				if(filename1.innerHTML != filenameIn1)
+				{
+					filename1.innerHTML = filenameIn1
+				}
+				if(filename0.innerHTML != filenameIn0)
+				{
+					filename0.innerHTML = filenameIn0
+				}
+
+				var hours = Math.floor(totalWritten / 48000 / 60 / 60)
+				var minutes = Math.floor((totalWritten / 48000 / 60) % 60)
+				var seconds = Math.floor((totalWritten / 48000) % 60)
+				var writtenText = pad(hours, 2) + ":" + pad(minutes, 2) + ":" + pad(seconds, 2)
+
+				if(length.innerHTML != writtenText)
+				{
+					length.innerHTML = writtenText
+				}
+
+				hours = Math.floor(totalRemane / 48000 / 60 / 60)
+				minutes = Math.floor((totalRemane / 48000 / 60) % 60)
+				seconds = Math.floor((totalRemane / 48000) % 60)
+				var remaneText = "-" + pad(hours, 2) + ":" + pad(minutes, 2) + ":" + pad(seconds, 2)
+
+				if(remane.innerHTML != remaneText)
+				{
+					remane.innerHTML = remaneText
+				}
+
+
+				updateMeter(value0, meter0, 0)
+				updateMeter(value1, meter1, 1)
+				updateMeter(value2, meter2, 2)
+				updateMeter(value3, meter3, 3)
+
+
+
+
+				meterRefreshed = true
+			}
+		}
+		
+		var string = "meter"
+		if(needRecord)
+		{
+			string = string + "?record"
+			needRecord = false
+		}
+		else
+		if(needStop)
+		{
+			string = string + "?stop"
+			needStop = false
+		}
+
+		if(needVolume1)
+		{
+			var value = MAX_VOLUME * volume1.value / 100
+			string = string + "?volume1=" + Math.floor(value)
+			needVolume1 = false
+		}
+		
+		if(needVolume0)
+		{
+			var value = MAX_VOLUME * volume0.value / 100
+			string = string + "?volume0=" + Math.floor(value)
+			needVolume0 = false
+		}
+		
+		if(needMode)
+		{
+			string = string + "?mode=" + Math.floor(mode)
+			needMode = false
+		}
+		
+		string = string + "?foo=" + foo
+		foo++
+
+		http.open("GET", string, true)
+		http.send()
+	}
+	else
+	{
+		droppedResponses++
+		if(droppedResponses > 10)
+		{
+			meterRefreshed = true
+		}
+	}
+}
+
+
+function resizeEvent()
+{
+	volume1.width = window.innerWidth
+	volume0.width = window.innerWidth
+
+	meterW = window.innerWidth - RIGHT_MARGIN * 2
+	meterH = meterW / 20
+	meterFont = meterW / 30
+	
+	meter0.height = meterH
+	meter0.width = meterW
+	meter1.height = meterH
+	meter1.width = meterW
+	meter2.height = meterH
+	meter2.width = meterW
+	meter3.height = meterH
+	meter3.width = meterW
+	
+	meterDivisions.width = meterW
+	meterDivisions.height = meterFont
+
+	drawMeterDivisions()
+	refreshAll()
+}
+
+
+
+function setCookie(name, value) 
+{
+    var date = new Date()
+	var days = 60
+    date.setTime(date.getTime()+(days * 24 * 60 * 60 * 1000))
+    var expires = "; expires=" + date.toGMTString()
+	document.cookie = name + "=" + value + expires
+}
+
+function loadDefaults()
+{
+	var cookie = document.cookie.split(';')
+	for(var i = 0; i < cookie.length; i++)
+	{
+		cookie[i] = cookie[i].trim()
+		var row = cookie[i].split("=")
+		if(row[0].indexOf("volume1") == 0)
+		{
+			volume1.value = parseInt(row[1])
+			needVolume1 = true
+		}
+		else
+		if(row[0].indexOf("volume0") == 0)
+		{
+			volume0.value = parseInt(row[1])
+			needVolume0 = true
+		}
+		else
+		if(row[0].indexOf("mode") == 0)
+		{
+			mode = parseInt(row[1])
+			mode0.checked = (mode == 0)
+			mode1.checked = (mode == 1)
+			mode2.checked = (mode == 2)
+			mode3.checked = (mode == 3)
+			mode4.checked = (mode == 4)
+			meterMode()
+			needMode = true
+		}
+	}
+}
+
+
+</script>

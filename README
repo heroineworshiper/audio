@@ -1,0 +1,35 @@
+What you'll find here:
+
+Source code for 
+ultimate vlogging mic
+2 channel bootleg recorder
+Zoom handy recorder replacement
+
+None of these play back.  They just record & rely on copying files to a
+confuser for playback.
+
+audio.usbmic2: script which starts programs which formerly required Jackd
+
+asoundrc.usbmic2: ALSA configuration for getting stereo from 2
+soundcards which each record 1 channel
+
+html: html files for all the programs
+
+mic.FCStd: 10mm microphone capsule for headset
+
+usbmic.c: ultimate vlogging mic on raspberry pi with 1 soundcard
+
+usbmic2.c: 2 channel bootleg recorder on a raspberry pi with 2 soundcards
+
+ZOOM RECORDER REPLACEMENT:
+
+zoom.pcb: layout
+zoom.c, zoom.h: STM32 firmware
+zoompi.c: raspberry pi program
+
+
+
+
+
+
+

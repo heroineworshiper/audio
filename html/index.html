@@ -1,0 +1,477 @@
+<!-- Web interface for the ultimate vlogging mic -->
+<meta charset="utf-8">
+
+<style>
+
+h1 {
+    font-size: 300%;
+}
+
+.slidecontainer {
+    width: 100%;
+}
+
+.slider {
+    -webkit-appearance: none;
+    width: 90%;
+    height: 10%;
+    background: #ffffff;
+    outline: solid;
+    opacity: 1;
+    -webkit-transition: .2s;
+    transition: opacity .2s;
+}
+
+.slider:hover {
+    opacity: 1;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 10%;
+    height: 100%;
+    background: #000000;
+    cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+    width: 25px;
+    height: 100%;
+    background: #4CAF50;
+    cursor: pointer;
+}
+
+</style>
+
+<CENTER>
+<H1>
+<P>
+<canvas id="meterDivisions" style="border:0px solid #000000;"> </canvas><BR>
+<canvas id="meter"          style="border:0px solid #000000;"> </canvas><BR>
+<IMG SRC="single.gif" HEIGHT=25><BR>
+
+MIC GAIN:<BR>
+<input type="range" id="gain" class="slider" onchange="handleGain(value)"><P>
+
+HEADPHONE VOLUME:<BR>
+<input type="range" id="volume" class="slider" onchange="handleVolume(value)"><P>
+
+<div id="status">
+<P>
+<output id="filename"></output><BR>
+<output id="length"></output> RECORDED<BR>
+<output id="remane"></output> REMANEING<BR>
+<output id="wifi"></output><BR>
+</div>
+
+
+<div id="record">
+<IMG onClick="record()" SRC="record.png" BORDER=1 WIDTH=25%><P>
+</div>
+
+<div id="stop">
+<IMG onClick="stop()" SRC="stop.png" BORDER=1 WIDTH=25%><P>
+</div>
+</CENTER>
+
+debug=<output id="debug"></output><P>
+
+<script>
+
+
+
+
+var debug = document.getElementById("debug")
+var volume = document.getElementById("volume")
+var gain = document.getElementById("gain")
+var status = document.getElementById("status")
+var filename = document.getElementById("filename")
+var length = document.getElementById("length")
+var remane = document.getElementById("remane")
+var wifi = document.getElementById("wifi")
+var meter = document.getElementById("meter")
+var meterDivisions = document.getElementById("meterDivisions")
+var recordButton = document.getElementById("record")
+var stopButton = document.getElementById("stop")
+var needRecord = false
+var needStop = false
+var needVolume = true
+var needGain = true
+var RIGHT_MARGIN = 20
+var FONT_MARGIN = 2
+var MIN_DB = -90.0
+var meterW = 0
+var meterH = 0
+var meterFont = 0
+var max = MIN_DB
+var maxCounter = 0
+var MAX_COUNTER = 20
+var SAMPLERATE = 48000
+// max volume the Generalplus accepts
+var MAX_VOLUME = 60
+var MAX_GAIN = 30
+var totalPings = 0
+var totalSends = 0
+var totalResponses = 0
+var droppedResponses = 0
+var foo = 0
+
+stopButton.style.display = "none"
+//status.style.display = "none"
+resizeEvent()
+window.addEventListener("resize", resizeEvent, false)
+loadDefaults()
+setInterval(refreshMeter, 100);
+
+
+
+
+function handleGain(value)
+{
+	console.log("handleGain value="+ value);
+	setCookie("gain", gain.value)
+	needGain = true
+}
+
+
+function handleVolume(value)
+{
+	console.log("handleVolume volume="+ value);
+	setCookie("volume", volume.value)
+	needVolume = true
+}
+
+
+
+function record()
+{
+	console.log("record")
+//	recordButton.style.display = "none"
+//	stopButton.style.display = "inline"
+	needRecord = true
+}
+
+
+function stop()
+{
+	console.log("stop")
+//	recordButton.style.display = "inline"
+//	stopButton.style.display = "none"
+	needStop = true
+}
+
+
+
+function dbToX(db)
+{
+	return (db - MIN_DB) * meterW / -MIN_DB
+}
+
+function drawLine(ctx, x1, y1, x2, y2)
+{
+	ctx.beginPath();
+	ctx.moveTo(x1, y1);
+	ctx.lineTo(x2, y2);
+	ctx.stroke();
+}
+
+function fillRect(ctx, x1, y1, x2, y2)
+{
+	ctx.beginPath();
+	ctx.moveTo(x1, y1);
+	ctx.lineTo(x2, y1);
+	ctx.lineTo(x2, y2);
+	ctx.lineTo(x1, y2);
+	ctx.fill();
+}
+
+function drawRect(ctx, x1, y1, x2, y2)
+{
+	ctx.beginPath();
+	ctx.moveTo(x1, y1);
+	ctx.lineTo(x2, y1);
+	ctx.lineTo(x2, y2);
+	ctx.lineTo(x1, y2);
+	ctx.stroke();
+}
+
+function drawMeterDivisions()
+{
+	var ctx = meterDivisions.getContext("2d"); 
+	ctx.strokeStyle = "#000000";
+	ctx.font = meterFont  + "px sans-serif";
+	
+	ctx.textAlign = "right";
+	ctx.fillText("0", meterDivisions.width - FONT_MARGIN, meterDivisions.height - FONT_MARGIN);
+	drawLine(ctx, meterDivisions.width, 0, meterDivisions.width, meterDivisions.height);
+
+	ctx.textAlign = "left";
+	var ticks = [ -6, -12, -24, -40, -60, -80, MIN_DB ];
+	for(var i = 0; i < ticks.length; i++)
+	{
+		var db = ticks[i];
+		if(db >= MIN_DB)
+		{
+			var x = dbToX(db)
+
+			ctx.fillText(db, x + FONT_MARGIN, meterDivisions.height - FONT_MARGIN);
+			drawLine(ctx, x, 0, x, meterDivisions.height);
+		}
+	}
+}
+
+function pad(num, size) 
+{
+    var s = "000000000" + num;
+    return s.substr(s.length - size);
+}
+
+
+var meterRefreshed = true;
+function refreshMeter()
+{
+	totalPings++
+	debug.innerHTML = totalPings + " " + totalSends + " " + totalResponses
+
+	if(meterRefreshed)
+	{
+		meterRefreshed = false
+		droppedResponses = 0
+		totalSends++
+
+		var http = new XMLHttpRequest()
+		http.onreadystatechange = function() {
+			if(http.readyState == 4)
+			{
+				totalResponses++
+				var response = http.responseText.split(" ")
+
+				var value = parseFloat(response[0])
+				var recording = parseInt(response[1])
+				var totalWritten = parseInt(response[2])
+				var totalRemane = parseInt(response[3])
+				var wifiPower = parseInt(response[4])
+				var filenameIn = response[5]
+
+console.log("refreshMeter " + http.responseText + " totalWritten=" + totalWritten + " totalRemane=" + totalRemane)
+
+
+				if(recording > 0 && 
+					stopButton.style.display == "none")
+				{
+					recordButton.style.display = "none"
+					stopButton.style.display = "inline"
+				}
+				else
+				if(recording == 0 &&
+					recordButton.style.display == "none")
+				{
+					recordButton.style.display = "inline"
+					stopButton.style.display = "none"
+				}
+
+
+
+				var wifiText = "WIFI: LOW"
+				if(wifiPower > 0)
+				{
+					wifiText = "WIFI: HIGH"
+				}
+				if(wifi.innerHTML != wifiText)
+				{
+					wifi.innerHTML = wifiText
+				}
+
+//				if(recording > 0)
+//				{
+//					if(status.style.display == "none")
+//					{
+//						status.style.display = "inline"
+//					}
+					
+					if(filename.innerHTML != filenameIn)
+					{
+						filename.innerHTML = filenameIn
+					}
+					
+					var hours = Math.floor(totalWritten / 60 / 60)
+					var minutes = Math.floor((totalWritten / 60) % 60)
+					var seconds = Math.floor((totalWritten) % 60)
+					var writtenText = pad(hours, 2) + ":" + pad(minutes, 2) + ":" + pad(seconds, 2)
+					
+					if(length.innerHTML != writtenText)
+					{
+						length.innerHTML = writtenText
+					}
+					
+					hours = Math.floor(totalRemane / 60 / 60)
+					minutes = Math.floor((totalRemane / 60) % 60)
+					seconds = Math.floor((totalRemane) % 60)
+					var remaneText = pad(hours, 2) + ":" + pad(minutes, 2) + ":" + pad(seconds, 2)
+					
+					if(remane.innerHTML != remaneText)
+					{
+						remane.innerHTML = remaneText
+					}
+//				}
+//				else
+//				{
+//					if(status.style.display == "inline")
+//					{
+//						status.style.display = "none"
+//					}
+//				}
+				
+
+				var db = MIN_DB
+				if(value >= 1)
+				{
+//					var value2 = value / 8388607
+					var value2 = value / 32767
+					db = 20.0 * Math.log10(value2)
+				}
+
+
+
+				if(db > max)
+				{
+					max = db;
+					maxCounter = 0;
+				}
+				else
+				{
+					maxCounter++;
+					if(maxCounter >= MAX_COUNTER)
+					{
+						max = db;
+						maxCounter = 0;
+					}
+				}
+
+
+//console.log("refreshMeter text=" + http.responseText + " value=" + value + " max=" + max + " maxCounter=" + maxCounter)
+
+				var x = dbToX(db)
+
+				var canvas = document.createElement('canvas')
+				canvas.width = meter.width
+				canvas.height = meter.height
+				var ctx = meter.getContext("2d")
+				var ctx2 = canvas.getContext("2d")
+
+				ctx2.fillStyle = "#ffffff"
+				fillRect(ctx2, 0, 0, canvas.width, canvas.height)
+
+
+				ctx2.fillStyle = "#000000"
+				ctx2.strokeStyle = "#000000"
+				drawRect(ctx2, 0, 0, canvas.width, canvas.height)
+				fillRect(ctx2, 0, 0, x, canvas.height)
+
+	// draw the max
+				x = dbToX(max)
+				drawLine(ctx2, x, 0, x, canvas.height)
+				drawLine(ctx2, x + 1, 0, x + 1, canvas.height)
+
+
+	// blit it
+				ctx.drawImage(canvas, 0, 0)
+
+				meterRefreshed = true
+			}
+		}
+		
+		var string = "meter"
+		if(needRecord)
+		{
+			string = string + "?record"
+			needRecord = false
+		}
+		else
+		if(needStop)
+		{
+			string = string + "?stop"
+			needStop = false
+		}
+
+		if(needVolume)
+		{
+			var value = MAX_VOLUME * volume.value / 100
+			string = string + "?volume=" + Math.floor(value)
+			needVolume = false
+		}
+		
+		if(needGain)
+		{
+			var value = MAX_GAIN * gain.value / 100
+			string = string + "?gain=" + Math.floor(value)
+			needGain = false
+		}
+		
+		string = string + "?foo=" + foo
+		foo++
+
+		http.open("GET", string, true)
+		http.send()
+	}
+	else
+	{
+		droppedResponses++
+		if(droppedResponses > 10)
+		{
+			meterRefreshed = true
+		}
+	}
+}
+
+
+function resizeEvent()
+{
+	volume.width = window.innerWidth - RIGHT_MARGIN
+	meterW = window.innerWidth * .9
+	meterH = meterW / 5
+	meterFont = meterH / 6
+	meter.height = meterH
+	meter.width = meterW
+	meterDivisions.width = meterW
+	meterDivisions.height = meterFont
+
+	drawMeterDivisions()
+	refreshMeter()
+}
+
+
+
+function setCookie(name, value) 
+{
+    var date = new Date();
+	var days = 60;
+    date.setTime(date.getTime()+(days * 24 * 60 * 60 * 1000));
+    var expires = "; expires=" + date.toGMTString();
+	document.cookie = name + "=" + value + expires;
+}
+
+function loadDefaults()
+{
+	var cookie = document.cookie.split(';');
+	for(var i = 0; i < cookie.length; i++)
+	{
+		cookie[i] = cookie[i].trim();
+		var row = cookie[i].split("=");
+		if(row[0].indexOf("volume") == 0)
+		{
+			volume.value = parseInt(row[1]);
+			needVolume = true
+		}
+		else
+		if(row[0].indexOf("gain") == 0)
+		{
+			gain.value = parseInt(row[1]);
+			needGain = true
+		}
+	}
+}
+
+
+</script>
