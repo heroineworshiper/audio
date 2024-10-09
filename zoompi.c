@@ -1,7 +1,7 @@
 /*
  * Ultimate 4 channel audio recorder
  *
- * Copyright (C) 2018-2019 Adam Williams <broadcast at earthling dot net>
+ * Copyright (C) 2018-2024 Adam Williams <broadcast at earthling dot net>
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -410,7 +410,9 @@ void web_server_connection(void *ptr)
 					need_max = 1;
 					pthread_mutex_unlock(&www_mutex);
 //printf("web_server_connection %d: filename=%p\n", __LINE__, filename);
-// printf("web_server_connection %d: max=%d %d %d %d\n", __LINE__, max[0], 
+// printf("web_server_connection %d: max=%d %d %d %d\n", 
+// __LINE__, 
+// max[0], 
 // max[1], 
 // max[2], 
 // max[3]);
@@ -682,6 +684,14 @@ int get_file_channels(int mode, int file_number)
 // AUX I2S/I2S2
 				return 0;
 			}
+			break;
+
+// 1 file with 2 channels
+		case MONITOR_2CH:
+			if(file_number == MANE_FILE)
+    			return 2;
+            else
+                return 0;
 			break;
 	}
 }
@@ -958,7 +968,13 @@ printf("main %d: next file is #%d\n", __LINE__, next_file);
 				ptr += SAMPLESIZE * CHANNELS;
 			}
 		}
-		
+// printf("main %d max2=%d %d %d %d\n", 
+// __LINE__, 
+// max2[0], 
+// max2[1], 
+// max2[2], 
+// max2[3]);
+
 		pthread_mutex_lock(&www_mutex);
 // reset the peaks
 		if(need_max)
@@ -970,7 +986,7 @@ printf("main %d: next file is #%d\n", __LINE__, next_file);
 			}
 		}
 
-		int meter_num = 0;
+		int meter_channel = 0;
 		for(file_num = 0; file_num < FILES; file_num++)
 		{
 			int frame_size = get_frame_size(monitor_mode, file_num);
@@ -987,12 +1003,12 @@ printf("main %d: next file is #%d\n", __LINE__, next_file);
 #define SINGLE_ENDED_PEAKS \
 	for(i = 0; i < I2S_CHANNELS; i++) \
 	{ \
-		if(max2[meter_num + i] > max[meter_num + i]) \
+		if(max2[meter_channel + i] > max[meter_channel + i]) \
 		{ \
-			max[meter_num + i] = max2[meter_num + i]; \
+			max[meter_channel + i] = max2[meter_channel + i]; \
 		} \
 	} \
-	meter_num += I2S_CHANNELS;
+	meter_channel += I2S_CHANNELS;
 
 #define DIFFERENTIAL_PEAKS \
 	for(i = 0; i < file_samples; i++) \
@@ -1004,14 +1020,14 @@ printf("main %d: next file is #%d\n", __LINE__, next_file);
 		{ \
 			output = -output; \
 		} \
-		if(output > max[meter_num]) \
+		if(output > max[meter_channel]) \
 		{ \
-			max[meter_num] = output; \
+			max[meter_channel] = output; \
 		} \
 /* next I2S frame */ \
 		src += SAMPLESIZE * I2S_CHANNELS; \
 	} \
-	meter_num++;
+	meter_channel++;
 
 
 				switch(monitor_mode)
@@ -1020,7 +1036,18 @@ printf("main %d: next file is #%d\n", __LINE__, next_file);
 // all 4 channels use single ended peaks from the ARM
 						SINGLE_ENDED_PEAKS
 						break;
-;
+
+					case MONITOR_2CH:
+// last 2 channels use single ended peaks from the ARM
+	                    for(i = 0; i < I2S_CHANNELS; i++)
+	                    {
+		                    if(max2[I2S_CHANNELS + i] > max[I2S_CHANNELS + i])
+		                    {
+			                    max[I2S_CHANNELS + i] = max2[I2S_CHANNELS + i];
+		                    }
+	                    }
+						break;
+
 
 					case MONITOR_3CH:
 // aux channels are single ended
@@ -1046,26 +1073,30 @@ printf("main %d: next file is #%d\n", __LINE__, next_file);
 							{
 								output = -output;
 							}
-							if(output > max[meter_num])
+							if(output > max[meter_channel])
 							{
-								max[meter_num] = output;
+								max[meter_channel] = output;
 							}
 // next I2S frame
 							src += SAMPLESIZE * I2S_CHANNELS;
 						}
-						meter_num++;
+						meter_channel++;
 						break;
 					
 // each I2S outputs a diff
-						case MONITOR_2CH_DIFF:
-						case MONITOR_1CH_DIFF:
-							DIFFERENTIAL_PEAKS
-							break;
-					
+					case MONITOR_2CH_DIFF:
+					case MONITOR_1CH_DIFF:
+						DIFFERENTIAL_PEAKS
+						break;
 				}
-
 			}
 		}
+// printf("main %d max=%d %d %d %d\n", 
+// __LINE__, 
+// max[0], 
+// max[1], 
+// max[2], 
+// max[3]);
 
 
 		pthread_mutex_unlock(&www_mutex);
@@ -1174,6 +1205,7 @@ printf("main %d: next file is #%d\n", __LINE__, next_file);
 						{
 // each I2S passes through
 							case MONITOR_4CH:
+							case MONITOR_2CH:
 								*dst++ = *src++;
 								*dst++ = *src++;
 								*dst++ = *src++;
@@ -1286,8 +1318,8 @@ printf("main %d: next file is #%d\n", __LINE__, next_file);
 					{
 						file_state_t *file = &files[j];
 						sem_post(&file->write_lock);
-					
-					
+
+
 						pthread_join(file->tid, 0);
 
 // flush anything after recording = 0

@@ -23,6 +23,10 @@
 // Use MONITOR_2CH_AVG for channel averaging, because the 2 I2S's are out of sync
 #define MONITOR_1CH_DIFF 4
 
+// left right I2S3 with single ended inputs
+// 2 monitor_volumes used
+#define MONITOR_2CH 5
+
 #endif
 
 

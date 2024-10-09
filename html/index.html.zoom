@@ -157,6 +157,17 @@ MANE HEADPHONE VOLUME:<BR>
 			<H1>MONO +/-
 		</TD>
 	</TR>
+	<TR>
+		<TD>
+			<H1><input onClick="modeEvent()" type="radio" id="mode5" name="time" value="5">
+		</TD>
+		<TD>
+			<H1>OFF
+		</TD>
+		<TD>
+			<H1>L/R
+		</TD>
+	</TR>
 </TABLE>
 
 
@@ -196,6 +207,7 @@ var filename1 = document.getElementById("filename1")
 var filename0 = document.getElementById("filename0")
 var length = document.getElementById("length")
 var remane = document.getElementById("remane")
+var wifi = document.getElementById("wifi")
 
 var meter0 = document.getElementById("meter0")
 var meter1 = document.getElementById("meter1")
@@ -211,6 +223,7 @@ var mode1 = document.getElementById("mode1")
 var mode2 = document.getElementById("mode2")
 var mode3 = document.getElementById("mode3")
 var mode4 = document.getElementById("mode4")
+var mode5 = document.getElementById("mode5")
 
 
 // left I2S2, right from I2S3 with differential inputs
@@ -232,6 +245,10 @@ var MONITOR_2CH_AVG = 3
 // I2S3 differential inputs.  
 // Use MONITOR_2CH_AVG for channel averaging, because the 2 I2S's are out of sync
 var MONITOR_1CH_DIFF = 4
+
+// left right I2S3 with single ended inputs
+// 2 monitor_volumes used
+var MONITOR_2CH = 5
 
 var mode = MONITOR_2CH_DIFF
 
@@ -258,7 +275,8 @@ var max = [ MIN_DB, MIN_DB, MIN_DB, MIN_DB ]
 var maxCounter = [ 0, 0, 0, 0 ]
 var MAX_COUNTER = 20
 var SAMPLERATE = 48000
-var MAX_VOLUME = 32
+//var MAX_VOLUME = 32
+var MAX_VOLUME = 255
 var totalPings = 0
 var totalSends = 0
 var totalResponses = 0
@@ -317,6 +335,11 @@ function modeEvent()
 	{
 		mode = MONITOR_1CH_DIFF
 	}
+	else
+	if(mode5.checked)
+	{
+		mode = MONITOR_2CH
+	}
 
 	setCookie("mode", mode)
 	needMode = true
@@ -337,7 +360,7 @@ function meterMode()
 			meter3div.style.display = "none"
 			meterText = [ "AUX +/-", "MANE +/-", "", "" ]
 			break
-		
+
 		case MONITOR_4CH:
 			meter0div.style.display = "inline"
 			meter1div.style.display = "inline"
@@ -369,6 +392,14 @@ function meterMode()
 			meter3div.style.display = "none"
 			meterText = [ "MANE +/-", "", "", "" ]
 			break;
+		
+		case MONITOR_2CH:
+			meter0div.style.display = "none"
+			meter1div.style.display = "none"
+			meter2div.style.display = "inline"
+			meter3div.style.display = "inline"
+			meterText = [ "", "", "MANE L", "MANE R" ]
+			break
 	}
 }
 
@@ -469,7 +500,6 @@ function updateMeter(value, meter, index)
 	if(value >= 1)
 	{
 		var value2 = value / 8388607
-//		var value2 = value / 32767
 		db = 20.0 * Math.log10(value2)
 	}
 
@@ -558,6 +588,7 @@ function refreshAll()
 				var totalRemane = parseInt(response[6])
 				var filenameIn0 = response[7]
 				var filenameIn1 = response[8]
+				var wifiPower = parseInt(response[9])
 
 
 
@@ -575,6 +606,16 @@ function refreshAll()
 					stopButton.style.display = "none"
 				}
 				
+
+				var wifiText = "WIFI: LOW"
+				if(wifiPower > 0)
+				{
+					wifiText = "WIFI: HIGH"
+				}
+				if(wifi.innerHTML != wifiText)
+				{
+					wifi.innerHTML = wifiText
+				}
 
 				if(filename1.innerHTML != filenameIn1)
 				{
@@ -598,7 +639,7 @@ function refreshAll()
 				hours = Math.floor(totalRemane / 48000 / 60 / 60)
 				minutes = Math.floor((totalRemane / 48000 / 60) % 60)
 				seconds = Math.floor((totalRemane / 48000) % 60)
-				var remaneText = "-" + pad(hours, 2) + ":" + pad(minutes, 2) + ":" + pad(seconds, 2)
+				var remaneText = pad(hours, 2) + ":" + pad(minutes, 2) + ":" + pad(seconds, 2)
 
 				if(remane.innerHTML != remaneText)
 				{
@@ -731,6 +772,7 @@ function loadDefaults()
 			mode2.checked = (mode == 2)
 			mode3.checked = (mode == 3)
 			mode4.checked = (mode == 4)
+			mode5.checked = (mode == 5)
 			meterMode()
 			needMode = true
 		}

@@ -1,6 +1,6 @@
 /*
  * STM32 Controller for the ultimate 4 channel recorder
- * Copyright (C) 2012-2018 Adam Williams <broadcast at earthling dot net>
+ * Copyright (C) 2012-2024 Adam Williams <broadcast at earthling dot net>
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -748,6 +748,11 @@ int main(void)
 								last_channel2 * monitor_volume1;
 							output1 = last_channel1 * monitor_volume0 + 
 								last_channel3 * monitor_volume1;
+							break;
+						
+						case MONITOR_2CH:
+							output0 = last_channel2 * monitor_volume1;
+							output1 = last_channel3 * monitor_volume1;
 							break;
 						
 						case MONITOR_3CH:
